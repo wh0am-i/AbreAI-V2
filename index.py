@@ -33,6 +33,8 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 import pytesseract as tsr
+import pyautogui as gui
+pyautogui.PAUSE = 1 #timer padrão pro autogui
 from mss import mss
 from PIL import Image
 
@@ -168,6 +170,10 @@ while True:  # enquanto n houver break (ctrl+c no terminal)
                             key = dado.id
                             db.collection('demandas').document(key).update({'arrive': localhourandminute})
                     confirm[y] = True
+                    gui.hotkey('alt', 'tab')
+                    gui.write('python3 servo.py')
+                    gui.press('enter')
+                    gui.hotkey('alt', 'tab')
                 y += 1
             else:
                 print("Aguardando leitura de placa...")
