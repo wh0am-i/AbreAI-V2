@@ -1,29 +1,31 @@
 """
-optical character recognition (OCR) 
+Coódigo de leitura de placa Optical Character Recognition (OCR), realizado para a apresentação da SA(Situação de Aprendizagem) 
+da finalização do curso de aprendizagem industrial em telecomunicações.
 
-Afazeres:  
-ajustar tamanho do frame conforme o monitor
-Colocar tolerância de caracter, se 90% dos caracteres da placa tiverem...
-ou treinamento da AI
-em questão do horário, fazer o mesmo dos minutos só que pra caso horas seja 00 ou 24
-incluir abertura do portão via arduino ou esp
-tirar os prints como o de atual OCR e do intervalo_horarios
-bastante lagging no looping
+Improvements:  
+-treinamento da AI
+-transcrever horário assim como minutos, ex, 23+1 = 00
+-trocar autogui por selenium
+-utilizar mais estruturas de decição na leitura de placa, como por exemplo analisar primeiro a forma se True analisar o texto
 
 Instalações:
 apt-get install python3
 apt-get install python3-pip
 pip install opencv-python
-pip install pandas
 pip install firebase_admin
 pip install tesseract
-pip install pytesseract-ocr
+pip install pytesseract
+instalação pelo .exe --> https://github.com/UB-Mannheim/tesseract/wiki
+pip install pyautogui
+pip install mss
 
 Author: https://github.com/wh0am-i
 """
 
 
 # ========BIBLIOTECAS========
+from PIL import Image
+from mss import mss
 from types import NoneType
 import numpy as np
 import datetime
@@ -34,9 +36,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 import pytesseract as tsr
 import pyautogui as gui
-pyautogui.PAUSE = 1 #timer padrão pro autogui
-from mss import mss
-from PIL import Image
+gui.PAUSE = 1  # timer padrão pro autogui
 
 # ========aquisição do horário========
 localtime = datetime.datetime.now()
@@ -63,7 +63,7 @@ db = firestore.client()  # inicia o firestore cloud
 def captura_tela():  # function para capturar tela
     sct = mss()
 
-    box = {'top': 100, 'left': 0, 'width': 1500, 'height': 1000}
+    box = {'top': 100, 'left': 0, 'width': 1900, 'height': 1000}
 
     sct_img = sct.grab(box)
 
@@ -80,10 +80,10 @@ horarios = []
 
 def atualiza_bd():  # function para atualizar bd
     placas_bd = db.collection("demandas").get()
-    placas.clear() 
+    placas.clear()
     for placa in placas_bd:  # placa percorre todos os documentos da colletion
         placa = placa.get('plate')
-        
+
         placas.append(placa)
     horarios.clear()
     horarios_bd = db.collection("demandas").get()
@@ -104,14 +104,14 @@ def intervalo_horarios(index):
         horas = int(dividir[0])
         minutos = int(dividir[1])
         if (minutos + w) < 0:
-            # var para transformar horário arrumar isso **********
+            # var para transformar horário arrumar isso ****
             minutos = (minutos + w) + 60
             horas -= 1
             horarios_disponiveis.append(str(horas)+":"+str(minutos))
             horas += 1
 
         elif (minutos + w) > 60:
-            # var para transformar horário arrumar isso **********
+            # var para transformar horário arrumar isso ****
             minutos = (minutos + w) - 60
             horas += 1
             horarios_disponiveis.append(str(horas)+":0"+str(minutos))
@@ -126,13 +126,13 @@ def intervalo_horarios(index):
 
 
 timer = 0
-atualiza_bd()  
+atualiza_bd()
 confirm = [None] * len(placas)
 # ========loop leitura========
 # looping para verificar se a placa está no bd
 print("Iniciando leitura de placas...")
 while True:  # enquanto n houver break (ctrl+c no terminal)
-    atualiza_bd()  
+    atualiza_bd()
     # "%H:%M:%S" para horas, minutos e segundos
     localhourandminute = time.strftime("%H:%M", time.localtime())
 
@@ -155,9 +155,13 @@ while True:  # enquanto n houver break (ctrl+c no terminal)
         intervalo_horarios(horarios[y])
         # adicionar aqui dentro a abertura do portão
         if localhourandminute in horarios_disponiveis:
+            tolerate = 0 #criação de uma tolerância de similaridade com a placa
             imgfinal = tsr.image_to_string(img, config=custom_config)
             timer += 4  # agiliza o timer pq a leitura demora mais
-            if placas[y] in imgfinal:
+            placa_split = placas[y]  # sem tempoo
+            if (placa_split[0:4] in imgfinal) or (placa_split[0:3] in imgfinal) or (placa_split[4:7] in imgfinal) or (placa_split[3:7] in imgfinal):
+                tolerate += 1
+            if tolerate >= 1:
                 print("Placa autorizada!")
                 if confirm[y] == None:
                     print("Registrando acesso...")
